@@ -1,0 +1,6 @@
+venv/
+weights/venv/
+runs/
+__pycache__/
+*.pyc
+.env

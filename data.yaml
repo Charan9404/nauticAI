@@ -1,0 +1,14 @@
+path: C:/Users/91948/nauticai/dataset
+train: images/train
+val: images/val
+
+nc: 7
+
+names:
+  0: corrosion
+  1: marine_growth
+  2: debris
+  3: damage
+  4: free_span
+  5: healthy
+  6: anode

@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #05050a;
+  --surface: #0a0a12;
+  --lavender: #a78bfa;
+  --lavender-dim: rgba(167, 139, 250, 0.15);
+  --lavender-glow: rgba(167, 139, 250, 0.25);
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Grid overlay */
+.grid-bg {
+  background-image: linear-gradient(rgba(167, 139, 250, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(167, 139, 250, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  animation: grid-pulse 18s ease-in-out infinite;
+}
+
+@keyframes grid-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Glow orb */
+.glow-orb {
+  background: radial-gradient(
+    circle at center,
+    rgba(124, 58, 237, 0.2) 0%,
+    rgba(139, 92, 246, 0.08) 40%,
+    transparent 70%
+  );
+  animation: orb-pulse 4s ease-in-out infinite;
+}
+
+@keyframes orb-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
