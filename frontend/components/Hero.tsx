@@ -29,18 +29,18 @@ export function Hero() {
     };
   }, []);
   return (
-    <section className="relative flex min-h-[90vh] flex-col justify-center px-6 pt-24 pb-20 md:flex-row md:items-center md:gap-16 md:px-12 lg:px-16">
-      <div className="relative z-10 flex-1">
+    <section className="relative flex min-h-[85vh] flex-col justify-center px-4 pt-20 pb-16 sm:min-h-[90vh] sm:px-6 sm:pt-24 sm:pb-20 md:flex-row md:items-center md:gap-16 md:px-12 lg:px-16">
+      <div className="relative z-10 min-w-0 flex-1">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="max-w-2xl"
         >
-          <p className="mb-4 text-sm font-medium uppercase tracking-widest text-lavender-400">
+          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-lavender-400 sm:mb-4 sm:text-sm">
             AI Intelligence Layer · Maritime Safety
           </p>
-          <h1 className="font-display text-4xl font-bold leading-[1.1] tracking-tight text-white md:text-5xl lg:text-6xl">
+          <h1 className="font-display text-3xl font-bold leading-[1.1] tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl">
             Full-Stack Underwater
             <br />
             <span className="bg-gradient-to-r from-lavender-300 via-lavender-400 to-lavender-500 bg-clip-text text-transparent">
@@ -65,7 +65,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
-            className="mt-10 flex flex-wrap gap-4"
+            className="mt-8 flex flex-wrap gap-3 sm:mt-10 sm:gap-4"
           >
             <Link
               href={user ? "/detect" : "/auth/sign-up?next=/detect"}

@@ -19,11 +19,11 @@ export function PartnerStrip() {
       transition={{ delay: 0.8 }}
       className="border-t border-dark-border bg-dark-surface/50 py-8"
     >
-      <div className="mx-auto max-w-7xl px-6">
-        <p className="mb-6 text-center text-xs font-medium uppercase tracking-widest text-slate-500">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <p className="mb-4 text-center text-xs font-medium uppercase tracking-widest text-slate-500 sm:mb-6">
           Powered by
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 md:gap-12">
           {partners.map((name, i) => (
             <motion.div
               key={name}

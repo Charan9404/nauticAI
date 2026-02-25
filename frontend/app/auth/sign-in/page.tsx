@@ -37,8 +37,8 @@ function SignInInner() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-dark-bg px-6 py-12">
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-dark-border bg-dark-card/80 p-8 shadow-lavender-glow backdrop-blur-xl">
+    <div className="flex min-h-screen items-center justify-center bg-dark-bg px-4 py-8 sm:px-6 sm:py-12">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-dark-border bg-dark-card/80 p-5 shadow-lavender-glow backdrop-blur-xl sm:p-8">
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-lavender-400/80">
           NautiCAI Access
         </p>

@@ -21,8 +21,8 @@ export function Header() {
       transition={{ duration: 0.5 }}
       className="fixed top-0 left-0 right-0 z-50 border-b border-dark-border/50 bg-dark-bg/80 backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2">
+      <div className="mx-auto flex h-14 min-h-14 max-w-7xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2">
           {logoError ? (
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-lavender-500 to-lavender-700 shadow-lg shadow-lavender-glow">
@@ -52,6 +52,11 @@ export function Header() {
           )}
         </Link>
 
+        {/* Mobile: compact nav links */}
+        <nav className="flex items-center gap-3 sm:gap-4 md:hidden">
+          <Link href="/learn" className="text-xs font-medium text-slate-400 hover:text-lavender-200">Learn</Link>
+          <Link href="https://www.nauticai-ai.com/about" target="_blank" rel="noreferrer" className="text-xs font-medium text-slate-400 hover:text-lavender-200">About</Link>
+        </nav>
         <nav className="relative hidden items-center gap-8 md:flex">
           {/* Product with Tenderly-style dropdown */}
           <div
@@ -151,21 +156,21 @@ export function Header() {
           </Link>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
           {user && (
             <button
               type="button"
               onClick={() => void signOut()}
-              className="rounded-lg border border-dark-border bg-dark-surface px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:border-lavender-500 hover:text-lavender-100"
+              className="rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-lavender-500 hover:text-lavender-100 sm:px-4 sm:py-2.5"
             >
               Sign out
             </button>
           )}
           <Link
             href={user ? "/detect" : "/auth/sign-in?next=/detect"}
-            className="rounded-lg bg-gradient-to-r from-lavender-600 to-lavender-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lavender-glow transition-all hover:from-lavender-500 hover:to-lavender-600 hover:shadow-lavender-glow-lg"
+            className="rounded-lg bg-gradient-to-r from-lavender-600 to-lavender-700 px-4 py-2 text-xs font-semibold text-white shadow-lavender-glow transition-all hover:from-lavender-500 hover:to-lavender-600 hover:shadow-lavender-glow-lg sm:px-5 sm:py-2.5 sm:text-sm"
           >
-            {user ? "Go to Dashboard" : "Sign in"}
+            {user ? "Dashboard" : "Sign in"}
           </Link>
         </div>
       </div>

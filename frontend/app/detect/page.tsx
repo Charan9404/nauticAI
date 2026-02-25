@@ -384,20 +384,23 @@ export default function DetectPage() {
 
       {/* Top bar */}
       <div className="sticky top-0 z-40 border-b border-dark-border/50 bg-dark-bg/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-6 md:h-14 md:py-0">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
             <Link
               href="/"
-              className="text-xs font-medium uppercase tracking-widest text-slate-500 transition hover:text-lavender-400"
+              className="shrink-0 text-xs font-medium uppercase tracking-widest text-slate-500 transition hover:text-lavender-400"
             >
               ← Home
             </Link>
-            <span className="font-display text-sm font-semibold text-white">
-              NautiCAI Detection Console
+            <span className="truncate font-display text-sm font-semibold text-white">
+              <span className="hidden sm:inline">NautiCAI Detection Console</span>
+              <span className="sm:hidden">Console</span>
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500">Signed in as {user.email}</span>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <span className="max-w-[120px] truncate text-xs text-slate-500 sm:max-w-none" title={user.email}>
+              Signed in as {user.email}
+            </span>
             <button
               type="button"
               onClick={() => {
@@ -411,28 +414,30 @@ export default function DetectPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mx-auto flex max-w-7xl gap-1 px-4 md:px-6">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`rounded-t-lg border border-b-0 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition ${
-                tab === t.id
-                  ? "border-lavender-500/50 bg-dark-card/80 text-lavender-200 shadow-sm"
-                  : "border-transparent text-slate-500 hover:bg-dark-card/40 hover:text-slate-300"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Tabs — scroll horizontally on narrow screens */}
+        <div className="mx-auto max-w-7xl overflow-x-auto px-4 sm:px-6">
+          <div className="flex w-max min-w-full gap-1 pb-px">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`shrink-0 rounded-t-lg border border-b-0 px-4 py-3 text-xs font-semibold uppercase tracking-wider transition sm:px-5 ${
+                  tab === t.id
+                    ? "border-lavender-500/50 bg-dark-card/80 text-lavender-200 shadow-sm"
+                    : "border-transparent text-slate-500 hover:bg-dark-card/40 hover:text-slate-300"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        {/* Mission summary strip — always visible */}
-        <section className="mb-8 grid gap-4 sm:grid-cols-4">
+        {/* Mission summary strip — always visible; 2x2 on mobile, 4 cols on sm+ */}
+        <section className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:grid-cols-4 sm:gap-4">
           <MetricCard label="Total detections" value={summary.total} accent="white" />
           <MetricCard label="Critical" value={summary.critical} accent="red" />
           <MetricCard label="Warnings" value={summary.warnings} accent="amber" />
@@ -457,12 +462,12 @@ export default function DetectPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="space-y-8"
+              className="space-y-6 sm:space-y-8"
             >
-              <section className="rounded-2xl border border-dark-border bg-dark-card/70 p-6 shadow-lavender-glow/30 backdrop-blur-md">
-                <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <section className="rounded-2xl border border-dark-border bg-dark-card/70 p-4 shadow-lavender-glow/30 backdrop-blur-md sm:p-6">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6">
                   <div>
-                    <h2 className="font-display text-xl font-semibold text-white">
+                    <h2 className="font-display text-lg font-semibold text-white sm:text-xl">
                       Upload & run detection
                     </h2>
                     <p className="mt-1 text-sm text-slate-400">
@@ -601,7 +606,7 @@ export default function DetectPage() {
               </section>
 
               {Object.keys(detCounts).length > 0 && tab === "image" && (
-                <section className="rounded-2xl border border-dark-border bg-dark-card/70 p-6 shadow-lavender-glow/30 backdrop-blur-md">
+                <section className="rounded-2xl border border-dark-border bg-dark-card/70 p-4 shadow-lavender-glow/30 backdrop-blur-md sm:p-6">
                   <h2 className="mb-4 font-display text-lg font-semibold text-white">
                     Detections this session
                   </h2>
@@ -640,7 +645,7 @@ export default function DetectPage() {
               exit={{ opacity: 0, y: -8 }}
               className="space-y-8"
             >
-              <section className="rounded-2xl border border-dark-border bg-dark-card/70 p-6 shadow-lavender-glow/30 backdrop-blur-md">
+              <section className="rounded-2xl border border-dark-border bg-dark-card/70 p-4 shadow-lavender-glow/30 backdrop-blur-md sm:p-6">
                 <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                   <div>
                     <h2 className="font-display text-xl font-semibold text-white">
@@ -729,7 +734,7 @@ export default function DetectPage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
                     <MetricCard label="Total" value={summary.total} accent="white" />
                     <MetricCard label="Critical" value={summary.critical} accent="red" />
                     <MetricCard label="Warnings" value={summary.warnings} accent="amber" />
@@ -737,7 +742,7 @@ export default function DetectPage() {
                   </div>
 
                   <div className="grid gap-8 lg:grid-cols-2">
-                    <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-6 backdrop-blur-sm">
+                    <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-4 backdrop-blur-sm sm:p-6">
                       <h2 className="mb-4 font-display text-lg font-semibold text-white">
                         Breakdown by class
                       </h2>
@@ -769,7 +774,7 @@ export default function DetectPage() {
                       </ul>
                     </section>
 
-                    <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-6 backdrop-blur-sm">
+                    <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-4 backdrop-blur-sm sm:p-6">
                       <h2 className="mb-4 font-display text-lg font-semibold text-white">
                         Mission details (for PDF)
                       </h2>
@@ -783,7 +788,7 @@ export default function DetectPage() {
                   </div>
 
                   {anomalyLog.length > 0 && (
-                    <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-6 backdrop-blur-sm">
+                    <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-4 backdrop-blur-sm sm:p-6">
                       <h2 className="mb-4 font-display text-lg font-semibold text-white">
                         Detection timeline
                       </h2>
@@ -823,7 +828,7 @@ export default function DetectPage() {
                     </section>
                   )}
 
-                  <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-6 backdrop-blur-sm">
+                  <section className="rounded-2xl border border-dark-border bg-dark-card/60 p-4 backdrop-blur-sm sm:p-6">
                     <h2 className="mb-4 font-display text-lg font-semibold text-white">
                       Anomaly snapshots
                     </h2>

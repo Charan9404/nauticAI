@@ -7,7 +7,7 @@ import { Header } from "@/components/Header";
 
 export default function LearnPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050316] text-slate-100">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#050316] text-slate-100">
       {/* Abstract purple glow background, tuned to match main UI */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-[#050316] via-[#050016] to-[#020617]" />
@@ -18,14 +18,14 @@ export default function LearnPage() {
 
       <Header />
 
-      <main className="mx-auto max-w-6xl px-4 pb-16 pt-28 md:px-6 md:pt-32">
+      <main className="mx-auto max-w-6xl px-4 pb-12 pt-24 sm:pb-16 sm:pt-28 md:px-6 md:pt-32">
         {/* Hero */}
-        <section className="grid gap-10 md:grid-cols-[1.2fr,1fr] md:items-center">
-          <div>
+        <section className="grid gap-8 md:grid-cols-[1.2fr,1fr] md:items-center md:gap-10">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-lavender-300">
               Learn · NautiCAI Anomaly Detection
             </p>
-            <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-white md:text-4xl lg:text-5xl">
+            <h1 className="mt-3 font-display text-2xl font-semibold leading-tight text-white sm:text-3xl md:text-4xl lg:text-5xl">
               How NautiCAI detects{" "}
               <span className="bg-gradient-to-r from-lavender-300 to-lavender-500 bg-clip-text text-transparent">
                 underwater anomalies
@@ -55,7 +55,7 @@ export default function LearnPage() {
               </a>
             </div>
 
-            <div className="mt-6 grid gap-4 text-xs text-slate-300 sm:grid-cols-3">
+            <div className="mt-6 grid gap-3 text-xs text-slate-300 sm:grid-cols-3 sm:gap-4">
               <div className="rounded-xl border border-dark-border bg-dark-card/80 p-3">
                 <p className="font-display text-sm font-semibold text-white">Real mission focus</p>
                 <p className="mt-1">

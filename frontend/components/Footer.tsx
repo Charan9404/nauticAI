@@ -4,8 +4,8 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="relative border-t border-dark-border/50 bg-dark-surface/30 py-8">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 md:flex-row">
+    <footer className="relative border-t border-dark-border/50 bg-dark-surface/30 py-6 sm:py-8">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6 md:flex-row">
         <Link href="/" className="font-display text-sm font-semibold tracking-wider text-lavender-400/80">
           NAUTICAI
         </Link>
