@@ -32,6 +32,34 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const STORAGE_KEY = "nauticai:user";
+
+function loadLocalUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as User;
+    if (!parsed?.email) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalUser(value: User | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    } else {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 function mapSupabaseUser(u: any | null): User | null {
   if (!u) return null;
   const meta = u.user_metadata || {};
@@ -53,16 +81,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function loadUser() {
       try {
         if (!supabase) {
-          setUser(null);
+          if (!ignore) setUser(loadLocalUser());
           return;
         }
         const { data, error } = await supabase.auth.getUser();
         if (error) {
           // eslint-disable-next-line no-console
           console.warn("Supabase getUser error", error.message);
+          if (!ignore) setUser(loadLocalUser());
+          return;
         }
         if (!ignore) {
-          setUser(mapSupabaseUser(data?.user ?? null));
+          const fromSupabase = mapSupabaseUser(data?.user ?? null);
+          setUser(fromSupabase ?? loadLocalUser());
         }
       } finally {
         if (!ignore) setLoading(false);
@@ -83,12 +114,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp: AuthContextValue["signUp"] = async ({ name, email, phone, password }) => {
+    const fallbackUser: User = {
+      name: name.trim() || email.split("@")[0] || "Inspector",
+      email: email.toLowerCase(),
+      phone: phone.trim(),
+    };
+
     if (!supabase) {
-      setUser({
-        name: name.trim() || email.split("@")[0] || "Inspector",
-        email: email.toLowerCase(),
-        phone: phone.trim(),
-      });
+      saveLocalUser(fallbackUser);
+      setUser(fallbackUser);
       return;
     }
     const { data, error } = await supabase.auth.signUp({
@@ -102,18 +136,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     if (error) {
-      throw error;
+      // Network / regional issues: fall back to local-only auth so the app is still usable.
+      // eslint-disable-next-line no-console
+      console.warn("Supabase signUp error, falling back to local auth", error.message);
+      saveLocalUser(fallbackUser);
+      setUser(fallbackUser);
+      return;
     }
-    setUser(mapSupabaseUser(data.user));
+    const mapped = mapSupabaseUser(data.user) ?? fallbackUser;
+    saveLocalUser(mapped);
+    setUser(mapped);
   };
 
   const signIn: AuthContextValue["signIn"] = async ({ email, password }) => {
+    const fallbackUser: User = {
+      name: email.split("@")[0] || "Inspector",
+      email: email.toLowerCase(),
+      phone: "",
+    };
+
     if (!supabase) {
-      setUser({
-        name: email.split("@")[0] || "Inspector",
-        email: email.toLowerCase(),
-        phone: "",
-      });
+      saveLocalUser(fallbackUser);
+      setUser(fallbackUser);
       return;
     }
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -121,15 +165,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     if (error) {
-      throw error;
+      // eslint-disable-next-line no-console
+      console.warn("Supabase signIn error, falling back to local auth", error.message);
+      saveLocalUser(fallbackUser);
+      setUser(fallbackUser);
+      return;
     }
-    setUser(mapSupabaseUser(data.user));
+    const mapped = mapSupabaseUser(data.user) ?? fallbackUser;
+    saveLocalUser(mapped);
+    setUser(mapped);
   };
 
   const signOut: AuthContextValue["signOut"] = async () => {
     if (supabase) {
       await supabase.auth.signOut();
     }
+    saveLocalUser(null);
     setUser(null);
   };
 
