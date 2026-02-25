@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "NautiCAI — Explore Safer Seas",
   description:
     "AI-powered underwater anomaly detection for maritime safety. Hull inspection, pipelines, subsea infrastructure.",
+  icons: {
+    icon: "/logo.webp",
+    apple: "/logo.webp",
+  },
 };
 
 export default function RootLayout({
