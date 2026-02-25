@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -73,7 +73,6 @@ type TabId = "image" | "video" | "report";
 export default function DetectPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [tab, setTab] = useState<TabId>("image");
   const [anomalyLog, setAnomalyLog] = useState<AnomalyLogItem[]>([]);
