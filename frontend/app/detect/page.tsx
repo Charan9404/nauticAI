@@ -98,7 +98,6 @@ export default function DetectPage() {
   const [loadingProgress, setLoadingProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
-  const [agentLoading, setAgentLoading] = useState(false);
   const [agentResult, setAgentResult] = useState<AgentMissionResponse | null>(null);
   const [imageModalSrc, setImageModalSrc] = useState<string | null>(null);
   const [imageModalCaption, setImageModalCaption] = useState<string>("");
@@ -134,7 +133,7 @@ export default function DetectPage() {
     []
   );
 
-  const runSingleImageDetection = async (file: File): Promise<void> => {
+  const runSingleImageDetection = async (file: File) => {
     const form = new FormData();
     form.append("file", file);
     form.append("confidence", String(confidence));
@@ -148,15 +147,62 @@ export default function DetectPage() {
       return next;
     });
     mergeResults(data.anomaly_log, data.det_counts, data.summary);
+    return data;
   };
 
+  const triggerAgentAlert = useCallback(
+    (payload: {
+      anomaly_log: AnomalyLogItem[];
+      det_counts: Record<string, number>;
+      summary: Summary;
+    }) => {
+      if (payload.anomaly_log.length === 0 || !user?.phone?.trim()) return;
+      runAgentMission({
+        anomaly_log: payload.anomaly_log,
+        det_counts: payload.det_counts,
+        summary: payload.summary,
+        mission_name: missionName,
+        operator_name: operatorName,
+        vessel_id: vesselId,
+        location,
+        phone: user.phone.replace(/\s/g, ""),
+        send_whatsapp: true,
+      })
+        .then((res) => {
+          setAgentResult(res);
+          setTab("report");
+        })
+        .catch(() => {});
+    },
+    [user?.phone, missionName, operatorName, vesselId, location]
+  );
+
   const runImageDetection = async (file: File) => {
+    // Start a fresh mission session for this run
+    setAnomalyLog([]);
+    setDetCounts({});
+    setSummary({ total: 0, critical: 0, warnings: 0, normal: 0 });
+    setAnnotatedImages([]);
+    setActiveImageIndex(0);
+    setAgentResult(null);
     setError(null);
     setLoading(true);
     setLoadingProgress(null);
     try {
-      await runSingleImageDetection(file);
+      const data = await runSingleImageDetection(file);
       setTab("image");
+      const mergedLog = [...anomalyLog, ...data.anomaly_log];
+      const mergedCounts = { ...detCounts };
+      for (const [k, v] of Object.entries(data.det_counts)) {
+        mergedCounts[k] = (mergedCounts[k] ?? 0) + v;
+      }
+      const mergedSummary = {
+        total: summary.total + data.summary.total,
+        critical: summary.critical + data.summary.critical,
+        warnings: summary.warnings + data.summary.warnings,
+        normal: summary.normal + data.summary.normal,
+      };
+      triggerAgentAlert({ anomaly_log: mergedLog, det_counts: mergedCounts, summary: mergedSummary });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Detection failed");
     } finally {
@@ -167,14 +213,39 @@ export default function DetectPage() {
 
   const runImageDetectionBatch = async (files: File[]) => {
     if (files.length === 0) return;
+    // Fresh mission session for this batch run
+    setAnomalyLog([]);
+    setDetCounts({});
+    setSummary({ total: 0, critical: 0, warnings: 0, normal: 0 });
+    setAnnotatedImages([]);
+    setActiveImageIndex(0);
+    setAgentResult(null);
     setError(null);
     setLoading(true);
+    let accumulatedLog: AnomalyLogItem[] = [];
+    let accumulatedCounts: Record<string, number> = {};
+    let accumulatedSummary: Summary = { total: 0, critical: 0, warnings: 0, normal: 0 };
     try {
       for (let i = 0; i < files.length; i++) {
         setLoadingProgress(`Processing image ${i + 1} of ${files.length}`);
-        await runSingleImageDetection(files[i]);
+        const data = await runSingleImageDetection(files[i]);
+        accumulatedLog = [...accumulatedLog, ...data.anomaly_log];
+        for (const [k, v] of Object.entries(data.det_counts)) {
+          accumulatedCounts[k] = (accumulatedCounts[k] ?? 0) + v;
+        }
+        accumulatedSummary = {
+          total: accumulatedSummary.total + data.summary.total,
+          critical: accumulatedSummary.critical + data.summary.critical,
+          warnings: accumulatedSummary.warnings + data.summary.warnings,
+          normal: accumulatedSummary.normal + data.summary.normal,
+        };
       }
       setTab("image");
+      triggerAgentAlert({
+        anomaly_log: accumulatedLog,
+        det_counts: accumulatedCounts,
+        summary: accumulatedSummary,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Detection failed");
     } finally {
@@ -184,6 +255,13 @@ export default function DetectPage() {
   };
 
   const runVideoAnalysis = async (file: File) => {
+    // Fresh mission session for this video run
+    setAnomalyLog([]);
+    setDetCounts({});
+    setSummary({ total: 0, critical: 0, warnings: 0, normal: 0 });
+    setAnnotatedImages([]);
+    setActiveImageIndex(0);
+    setAgentResult(null);
     setError(null);
     setLoading(true);
     try {
@@ -200,6 +278,18 @@ export default function DetectPage() {
       setActiveImageIndex(0);
       mergeResults(data.anomaly_log, data.det_counts, data.summary);
       setTab("report");
+      const mergedLog = [...anomalyLog, ...data.anomaly_log];
+      const mergedCounts = { ...detCounts };
+      for (const [k, v] of Object.entries(data.det_counts)) {
+        mergedCounts[k] = (mergedCounts[k] ?? 0) + v;
+      }
+      const mergedSummary = {
+        total: summary.total + data.summary.total,
+        critical: summary.critical + data.summary.critical,
+        warnings: summary.warnings + data.summary.warnings,
+        normal: summary.normal + data.summary.normal,
+      };
+      triggerAgentAlert({ anomaly_log: mergedLog, det_counts: mergedCounts, summary: mergedSummary });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Video analysis failed");
     } finally {
@@ -261,38 +351,6 @@ export default function DetectPage() {
 
   const closeImageModal = () => {
     setImageModalSrc(null);
-  };
-
-  const handleAgentAlert = async () => {
-    if (anomalyLog.length === 0) {
-      setError("Run detection on an image or video first.");
-      return;
-    }
-    if (!user.phone) {
-      setError("No phone number found for this user. Sign up with a phone number to receive WhatsApp alerts.");
-      return;
-    }
-    setError(null);
-    setAgentLoading(true);
-    try {
-      const res = await runAgentMission({
-        anomaly_log: anomalyLog,
-        det_counts: detCounts,
-        summary,
-        mission_name: missionName,
-        operator_name: operatorName,
-        vessel_id: vesselId,
-        location,
-        phone: user.phone,
-        send_whatsapp: true,
-      });
-      setAgentResult(res);
-      setTab("report");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Agent analysis failed");
-    } finally {
-      setAgentLoading(false);
-    }
   };
 
   if (authLoading || !user) {
@@ -828,14 +886,6 @@ export default function DetectPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={handleAgentAlert}
-                      disabled={agentLoading || anomalyLog.length === 0}
-                      className="rounded-xl border border-lavender-600/60 bg-lavender-600/10 px-4 py-2 text-sm font-semibold text-lavender-200 shadow-lavender-glow/40 transition hover:border-lavender-400 hover:bg-lavender-600/20 disabled:opacity-60"
-                    >
-                      {agentLoading ? "Sending WhatsApp alert…" : "Send smart WhatsApp alert"}
-                    </button>
-                    <button
-                      type="button"
                       onClick={resetSession}
                       className="rounded-xl border border-dark-border px-4 py-2 text-sm font-medium text-slate-400 transition hover:border-red-500/50 hover:text-red-300"
                     >
@@ -847,11 +897,18 @@ export default function DetectPage() {
                     <section className="mt-6 rounded-2xl border border-lavender-500/40 bg-dark-card/80 p-4 text-sm text-slate-200">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <p className="font-display text-sm font-semibold text-white">
-                          Agent mission triage — {agentResult.risk_level} risk
+                          Agent mission triage — {agentResult.risk_level} risk (auto after run)
                         </p>
-                        <span className="rounded-full bg-lavender-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lavender-200">
-                          WhatsApp {agentResult.whatsapp.sent ? "sent" : "not sent"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-lavender-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lavender-200">
+                            WhatsApp {agentResult.whatsapp.sent ? "sent" : "not sent"}
+                          </span>
+                          {agentResult.llm_used && (
+                            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                              LLM enhanced
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-slate-300">{agentResult.headline}</p>
                       {agentResult.bullets.length > 0 && (

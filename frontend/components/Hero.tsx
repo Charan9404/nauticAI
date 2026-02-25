@@ -2,6 +2,9 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 
 const features = [
   "Real-time hull & pipeline anomaly detection",
@@ -10,6 +13,21 @@ const features = [
 ];
 
 export function Hero() {
+  const { user } = useAuth();
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = (e: MediaQueryListEvent | MediaQueryList) => {
+      setPrefersReducedMotion(e.matches);
+    };
+    update(media);
+    media.addEventListener("change", update as (e: MediaQueryListEvent) => void);
+    return () => {
+      media.removeEventListener("change", update as (e: MediaQueryListEvent) => void);
+    };
+  }, []);
   return (
     <section className="relative flex min-h-[90vh] flex-col justify-center px-6 pt-24 pb-20 md:flex-row md:items-center md:gap-16 md:px-12 lg:px-16">
       <div className="relative z-10 flex-1">
@@ -50,10 +68,10 @@ export function Hero() {
             className="mt-10 flex flex-wrap gap-4"
           >
             <Link
-              href="/detect"
+              href={user ? "/detect" : "/auth/sign-up?next=/detect"}
               className="rounded-lg bg-gradient-to-r from-lavender-600 to-lavender-700 px-6 py-3 text-sm font-semibold text-white shadow-lavender-glow transition-all hover:from-lavender-500 hover:to-lavender-600 hover:shadow-lavender-glow-lg"
             >
-              Explore the model
+              {user ? "Open detection console" : "Start for free"}
             </Link>
             <Link
               href="https://www.nauticai-ai.com/contact"
@@ -65,31 +83,73 @@ export function Hero() {
         </motion.div>
       </div>
 
-      {/* Hero visual: abstract glow + grid */}
+      {/* Hero visual: glassmorphic video card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.8 }}
         className="relative hidden flex-1 md:block"
       >
-        <div className="relative aspect-square max-w-lg rounded-2xl border border-dark-border bg-dark-card/50 p-8 backdrop-blur-sm">
-          <div className="absolute inset-0 rounded-2xl bg-hero-glow opacity-80" />
-          <div className="grid-bg absolute inset-0 rounded-2xl" />
-          <div className="glow-orb absolute bottom-1/4 right-1/4 h-48 w-48 rounded-full bg-lavender-500/20 blur-3xl" />
+        <div className="relative aspect-square max-w-lg overflow-hidden rounded-2xl">
+          {/* Video / poster */}
+          {prefersReducedMotion ? (
+            <Image
+              src="/video1.png"
+              alt="ROV / AUV / Pipelines sonar scene"
+              fill
+              priority
+              sizes="(min-width: 1024px) 28rem, 20rem"
+              className="object-cover"
+            />
+          ) : (
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              aria-label="Underwater sonar view for ROV, AUV and pipeline inspection"
+              poster="/video1.png"
+              className="h-full w-full rounded-2xl object-cover opacity-95"
+              style={{
+                WebkitMaskImage:
+                  "radial-gradient(circle at 50% 50%, black 0%, black 45%, transparent 72%)",
+                maskImage:
+                  "radial-gradient(circle at 50% 50%, black 0%, black 45%, transparent 72%)",
+              }}
+            >
+              <source src="/video1.mp4" type="video/mp4" />
+            </video>
+          )}
+
+          {/* Content overlay */}
           <motion.div
-            animate={{ y: [0, -8, 0] }}
+            animate={{ y: [0, -6, 0] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            className="relative flex flex-col items-center justify-center gap-4 pt-12"
+            className="relative z-10 flex h-full flex-col items-center justify-center gap-4 px-6 text-center"
           >
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-lavender-500/30 bg-lavender-500/10">
-              <span className="text-4xl">🌊</span>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-lavender-400/40 bg-black/40 shadow-[0_0_35px_rgba(129,140,248,0.6)]">
+              <span className="text-3xl">🌊</span>
             </div>
-            <p className="font-display text-center text-sm font-medium text-lavender-300">
-              ROV · AUV · Pipelines
-            </p>
-            <p className="max-w-[200px] text-center text-xs text-slate-500">
-              Upload image or video → AI detection → Report & alerts
-            </p>
+            <div>
+              <p className="font-display text-sm font-semibold tracking-wide text-lavender-200">
+                ROV · AUV · Pipelines
+              </p>
+              <p className="mt-1 max-w-xs text-xs text-slate-300">
+                Upload image or video → AI detection → mission report & smart alerts.
+              </p>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[10px]">
+              <span className="rounded-full bg-black/50 px-3 py-1 text-slate-200">
+                Real-time scanning
+              </span>
+              <span className="rounded-full bg-black/50 px-3 py-1 text-slate-200">
+                YOLOv8 detection
+              </span>
+              <span className="rounded-full bg-black/50 px-3 py-1 text-slate-200">
+                PDF reports
+              </span>
+            </div>
           </motion.div>
         </div>
       </motion.div>

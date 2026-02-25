@@ -204,3 +204,34 @@ NautiCAI is a Singapore-based deep-tech venture developing AI-powered underwater
 ## 📬 Contact
 
 Built by **Charan** as part of the NautiCAI Internship Assignment · February 2026
+
+---
+
+## New Web UI & Agentic Layer (Summary)
+
+This repository now also contains a **Next.js frontend** and a **FastAPI-based agentic layer**:
+
+- **Backend**: `main_api.py`
+  - Image and video detection endpoints (`/api/detect/image`, `/api/detect/video`).
+  - PDF report generation (`/api/report/generate`).
+  - Agentic mission triage + WhatsApp + LLM (`/api/agent/mission-summary`).
+- **Frontend**: `frontend/`
+  - Modern dashboard at `/detect` with Image Detection, Video Analysis, and Mission Report tabs.
+  - Authentication with name/email/phone (phone used for WhatsApp alerts).
+  - “Learn” page explaining the product and sample outputs.
+
+### Running the new stack
+
+```bash
+# Backend
+cd NauticAi
+pip install -r requirements.txt
+python -m uvicorn main_api:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000` in the browser for the frontend, and `http://localhost:8000/docs` for the backend API docs.

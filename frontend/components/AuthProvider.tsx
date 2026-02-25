@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 type User = {
   name: string;
@@ -25,84 +26,108 @@ type AuthContextValue = {
     phone: string;
     password: string;
   }) => Promise<void>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 };
 
-const STORAGE_KEY = "nauticai:user";
-
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function mapSupabaseUser(u: any | null): User | null {
+  if (!u) return null;
+  const meta = u.user_metadata || {};
+  const email = (u.email as string | null) || "";
+  if (!email) return null;
+  return {
+    email,
+    name: (meta.name as string | undefined) || email.split("@")[0] || "Inspector",
+    phone: (meta.phone as string | undefined) || "",
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as User;
-        if (parsed && parsed.email) {
-          setUser(parsed);
+    let ignore = false;
+    async function loadUser() {
+      try {
+        if (!supabase) {
+          setUser(null);
+          return;
         }
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.warn("Supabase getUser error", error.message);
+        }
+        if (!ignore) {
+          setUser(mapSupabaseUser(data?.user ?? null));
+        }
+      } finally {
+        if (!ignore) setLoading(false);
       }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
     }
+    loadUser();
+
+    if (!supabase) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapSupabaseUser(session?.user ?? null));
+    });
+    return () => {
+      ignore = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  const setAndPersist = (value: User | null) => {
-    setUser(value);
-    if (typeof window === "undefined") return;
-    if (value) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
+  const signUp: AuthContextValue["signUp"] = async ({ name, email, phone, password }) => {
+    if (!supabase) {
+      setUser({
+        name: name.trim() || email.split("@")[0] || "Inspector",
+        email: email.toLowerCase(),
+        phone: phone.trim(),
+      });
+      return;
     }
-  };
-
-  const signUp: AuthContextValue["signUp"] = async ({
-    name,
-    email,
-    phone,
-  }) => {
-    const newUser: User = {
-      name: name.trim() || email.split("@")[0] || "Inspector",
+    const { data, error } = await supabase.auth.signUp({
       email: email.toLowerCase(),
-      phone: phone.trim(),
-    };
-    setAndPersist(newUser);
-  };
-
-  const signIn: AuthContextValue["signIn"] = async ({ email }) => {
-    const normalizedEmail = email.toLowerCase();
-    if (typeof window !== "undefined") {
-      try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const existing = JSON.parse(raw) as User;
-          if (existing.email === normalizedEmail) {
-            setAndPersist(existing);
-            return;
-          }
-        }
-      } catch {
-        // ignore and fall through
-      }
+      password,
+      options: {
+        data: {
+          name: name.trim(),
+          phone: phone.trim(),
+        },
+      },
+    });
+    if (error) {
+      throw error;
     }
-
-    const fallbackUser: User = {
-      name: normalizedEmail.split("@")[0] || "Inspector",
-      email: normalizedEmail,
-      phone: "",
-    };
-    setAndPersist(fallbackUser);
+    setUser(mapSupabaseUser(data.user));
   };
 
-  const signOut = () => {
-    setAndPersist(null);
+  const signIn: AuthContextValue["signIn"] = async ({ email, password }) => {
+    if (!supabase) {
+      setUser({
+        name: email.split("@")[0] || "Inspector",
+        email: email.toLowerCase(),
+        phone: "",
+      });
+      return;
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase(),
+      password,
+    });
+    if (error) {
+      throw error;
+    }
+    setUser(mapSupabaseUser(data.user));
+  };
+
+  const signOut: AuthContextValue["signOut"] = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setUser(null);
   };
 
   const value: AuthContextValue = useMemo(

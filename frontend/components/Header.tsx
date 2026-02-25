@@ -5,8 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 
 export function Header() {
+  const { user } = useAuth();
   const [logoError, setLogoError] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const pathname = usePathname();
@@ -90,11 +92,8 @@ export function Header() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = "/detect";
-                    }}
+                  <Link
+                    href={user ? "/detect" : "/auth/sign-in?next=/detect"}
                     className="group flex w-full items-center gap-4 rounded-xl border border-dark-border bg-gradient-to-r from-lavender-600/10 via-lavender-600/5 to-transparent p-4 text-left hover:border-lavender-500/60 hover:bg-lavender-600/15"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-lavender-600/20 text-lavender-200 shadow-lavender-glow">
@@ -120,9 +119,9 @@ export function Header() {
                       </div>
                     </div>
                     <span className="text-xs font-semibold text-lavender-300 group-hover:translate-x-0.5 group-hover:text-lavender-100">
-                      Open console →
+                      {user ? "Open console →" : "Sign in to try →"}
                     </span>
-                  </button>
+                  </Link>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -153,10 +152,10 @@ export function Header() {
         </nav>
 
         <Link
-          href="/detect"
+          href={user ? "/detect" : "/auth/sign-in?next=/detect"}
           className="rounded-lg bg-gradient-to-r from-lavender-600 to-lavender-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lavender-glow transition-all hover:from-lavender-500 hover:to-lavender-600 hover:shadow-lavender-glow-lg"
         >
-          Go to Dashboard
+          {user ? "Go to Dashboard" : "Sign in"}
         </Link>
       </div>
     </motion.header>

@@ -4,3 +4,7 @@ runs/
 __pycache__/
 *.pyc
 .env
+frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production

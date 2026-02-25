@@ -54,6 +54,7 @@ export type AgentMissionResponse = {
     sent: boolean;
     info: string;
   };
+  llm_used?: boolean;
 };
 
 export async function detectImage(form: FormData): Promise<DetectImageResponse> {

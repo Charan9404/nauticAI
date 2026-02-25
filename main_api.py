@@ -11,6 +11,7 @@ import tempfile
 import base64
 import io
 from pathlib import Path
+import json
 
 import cv2
 import numpy as np
@@ -114,6 +115,137 @@ def send_whatsapp_alert(phone: str, body: str) -> tuple[bool, str]:
         return True, msg.sid
     except Exception as e:
         return False, str(e)
+
+
+def call_gemini_mission_agent(
+    *,
+    risk_level: str,
+    mission_name: str,
+    vessel_id: str,
+    location: str,
+    operator_name: str,
+    anomaly_log: list,
+    det_counts: dict,
+    summary: dict,
+    base_headline: str,
+    base_recommendations: str,
+    base_whatsapp_message: str,
+) -> dict | None:
+    """
+    Optional LLM enhancement using Google Gemini.
+    Returns a dict:
+      {
+        "parsed": {...} or None,
+        "raw": <full model message content as string> or None
+      }
+    Falls back to heuristics if GEMINI_API_KEY or requests isn't available, or on any error.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    try:
+        import requests  # type: ignore
+    except Exception:
+        return None
+
+    system_prompt = (
+        "You are an underwater inspection mission assistant for NautiCAI. "
+        "Given structured detection data from hull/pipeline missions, you must:\n"
+        "1) Explain the mission risk level briefly.\n"
+        "2) Summarize the most important anomalies for an ROV/AUV operator.\n"
+        "3) Provide clear, concise next-step recommendations.\n"
+        "4) Generate a short WhatsApp-friendly alert message.\n"
+        "Respond strictly in compact JSON with keys: "
+        "headline (string), bullets (array of strings), "
+        "recommendations (string), whatsapp_message (string).\n\n"
+        "The whatsapp_message MUST follow this structure:\n"
+        "  - First line: \"Hey <operator_name>, we found <short risk summary>.\" (friendly but professional)\n"
+        "  - Then a blank line.\n"
+        "  - One line: \"Mission: <mission_name>\".\n"
+        "  - One line: \"Vessel/ROV: <vessel_id>\".\n"
+        "  - One line: \"Location: <location>\".\n"
+        "  - Blank line.\n"
+        "  - One line summarising counts, e.g. \"Detections: total=<total>, critical=<critical>, warnings=<warnings>.\".\n"
+        "  - Then a short bulleted list (max 3 bullets) of key findings, one per line, starting with \"• \".\n"
+        "  - Final line starting with \"Recommendation:\" and a concise action item.\n"
+        "Do not wrap the message in backticks or quotes. Keep it under 8 lines total."
+    )
+
+    payload = {
+        "risk_level": risk_level,
+        "mission_name": mission_name,
+        "vessel_id": vessel_id,
+        "location": location,
+        "operator_name": operator_name,
+        "anomaly_log": anomaly_log[:32],  # trim to keep payload small
+        "det_counts": det_counts,
+        "summary": summary,
+        "base_headline": base_headline,
+        "base_recommendations": base_recommendations,
+        "base_whatsapp_message": base_whatsapp_message,
+    }
+
+    user_prompt = (
+        "Here is the mission data in JSON format:\n"
+        f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n\n"
+        "Rewrite headline, bullets, recommendations and especially whatsapp_message to match the structure described "
+        "above. Use operator_name, mission_name, vessel_id, location, summary.total, summary.critical and "
+        "summary.warnings when constructing the message. "
+        "Return only JSON, no explanations."
+    )
+
+    try:
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        resp = requests.post(
+            endpoint,
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": system_prompt
+                                + "\n\n"
+                                + user_prompt
+                            }
+                        ],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 512,
+                    "responseMimeType": "application/json",
+                },
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return None
+        parts = candidates[0].get("content", {}).get("parts") or []
+        if not parts:
+            return None
+        content = parts[0].get("text", "")
+        # Try strict JSON first (response_format=json_object should enforce this)
+        parsed = None
+        try:
+            parsed = json.loads(content)
+        except Exception:
+            # Fallback: extract first JSON object from the text
+            start = content.find("{")
+            end = content.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                json_str = content[start : end + 1]
+                try:
+                    parsed = json.loads(json_str)
+                except Exception:
+                    parsed = None
+        return {"parsed": parsed, "raw": content}
+    except Exception:
+        return None
 
 # ── Smart log (same logic as Streamlit, no session state) ───────────────────
 def smart_log(cn: str, cf: float, ts: str, frame_bytes: bytes, class_tracker: dict, anomaly_log: list, det_counts: dict) -> bool:
@@ -502,7 +634,34 @@ async def agent_mission_summary(body: AgentMissionRequest):
     lines.extend(["", f"Recommendation: {recommendations}"])
     whatsapp_message = "\n".join(lines)
 
-    if body.send_whatsapp and body.phone and risk_level != "NONE":
+    # Optional Groq LLM enhancement
+    groq_enhancement = call_gemini_mission_agent(
+        risk_level=risk_level,
+        mission_name=body.mission_name,
+        vessel_id=body.vessel_id,
+        location=body.location,
+        operator_name=body.operator_name,
+        anomaly_log=anomaly_log,
+        det_counts=det_counts,
+        summary=summary,
+        base_headline=headline,
+        base_recommendations=recommendations,
+        base_whatsapp_message=whatsapp_message,
+    )
+    llm_used = False
+    llm_raw = None
+    if groq_enhancement:
+        groq_result = groq_enhancement.get("parsed") or {}
+        llm_raw = groq_enhancement.get("raw")
+        headline = groq_result.get("headline", headline)
+        new_bullets = groq_result.get("bullets")
+        if isinstance(new_bullets, list):
+            bullets = [str(b) for b in new_bullets][:6]
+        recommendations = groq_result.get("recommendations", recommendations)
+        whatsapp_message = groq_result.get("whatsapp_message", whatsapp_message)
+        llm_used = True
+
+    if body.send_whatsapp and body.phone and risk_level in {"MEDIUM", "HIGH"}:
         sent, info = send_whatsapp_alert(body.phone, whatsapp_message)
         whatsapp_result = {"attempted": True, "sent": sent, "info": info}
     else:
@@ -520,4 +679,6 @@ async def agent_mission_summary(body: AgentMissionRequest):
         "recommendations": recommendations,
         "whatsapp_message": whatsapp_message,
         "whatsapp": whatsapp_result,
+        "llm_used": llm_used,
+        "llm_raw": llm_raw,
     }

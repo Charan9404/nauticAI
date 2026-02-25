@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { PartnerStrip } from "@/components/PartnerStrip";
@@ -9,17 +8,17 @@ import { Footer } from "@/components/Footer";
 export default function HomePage() {
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      {/* Background image layer */}
-      <div className="fixed inset-0 -z-20">
-        <Image
-          src="/bgimage.jpg"
-          alt="Lavender grid background"
-          fill
-          priority
-          className="object-cover opacity-90"
-          sizes="100vw"
-        />
-      </div>
+      {/* Background video layer */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        className="fixed inset-0 -z-20 h-full w-full object-cover"
+      >
+        <source src="/bgvideo.mp4" type="video/mp4" />
+      </video>
 
       {/* Overlay gradients and grid to keep text readable */}
       <div className="fixed inset-0 -z-10 bg-dark-bg/50" />
