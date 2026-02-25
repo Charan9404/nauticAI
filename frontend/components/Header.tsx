@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 
 export function Header() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [logoError, setLogoError] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const pathname = usePathname();
@@ -151,12 +151,23 @@ export function Header() {
           </Link>
         </nav>
 
-        <Link
-          href={user ? "/detect" : "/auth/sign-in?next=/detect"}
-          className="rounded-lg bg-gradient-to-r from-lavender-600 to-lavender-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lavender-glow transition-all hover:from-lavender-500 hover:to-lavender-600 hover:shadow-lavender-glow-lg"
-        >
-          {user ? "Go to Dashboard" : "Sign in"}
-        </Link>
+        <div className="flex items-center gap-3">
+          {user && (
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="rounded-lg border border-dark-border bg-dark-surface px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:border-lavender-500 hover:text-lavender-100"
+            >
+              Sign out
+            </button>
+          )}
+          <Link
+            href={user ? "/detect" : "/auth/sign-in?next=/detect"}
+            className="rounded-lg bg-gradient-to-r from-lavender-600 to-lavender-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lavender-glow transition-all hover:from-lavender-500 hover:to-lavender-600 hover:shadow-lavender-glow-lg"
+          >
+            {user ? "Go to Dashboard" : "Sign in"}
+          </Link>
+        </div>
       </div>
     </motion.header>
   );

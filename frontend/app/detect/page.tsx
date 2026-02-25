@@ -372,7 +372,7 @@ export default function DetectPage() {
       {/* Background image just for detection console */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <Image
-          src="/bg2.jpg"
+          src="/bgx.png"
           alt="Detection console background"
           fill
           priority

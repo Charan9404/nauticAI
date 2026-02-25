@@ -200,6 +200,40 @@ export default function LearnPage() {
             />
           </div>
         </section>
+
+        {/* WhatsApp alerts */}
+        <section className="mt-16 grid gap-8 md:grid-cols-[1.1fr,1fr] md:items-center">
+          <div>
+            <h2 className="font-display text-2xl font-semibold text-white">Agent-driven WhatsApp alerts</h2>
+            <p className="mt-3 text-sm text-slate-300">
+              When a mission finishes with medium or high risk, the agent layer can turn the anomaly log into a
+              concise alert and send it over WhatsApp — ideal for operators who are not sitting in front of the
+              console.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              <li>• Alerts summarize risk level, vessel, location, and key anomalies.</li>
+              <li>• Messages are formatted so they are readable on mobile and in chat threads.</li>
+              <li>• You stay aligned with the console view: the agent reads the same timeline and snapshots.</li>
+            </ul>
+            <p className="mt-4 text-xs text-slate-400">
+              To receive sandbox WhatsApp alerts with this prototype, send the message{" "}
+              <span className="font-mono text-lavender-200">&quot;join same-variety&quot;</span> to{" "}
+              <span className="font-mono text-lavender-200">+14155238886</span> on WhatsApp. You can reply{" "}
+              <span className="font-mono text-lavender-200">STOP</span> in the same chat at any time to
+              unsubscribe.
+            </p>
+          </div>
+
+          <div className="relative h-64 overflow-hidden rounded-3xl border border-dark-border bg-dark-card/80 shadow-lavender-glow/40">
+            <Image
+              src="/wtsappmsg.jpeg"
+              alt="Example NautiCAI WhatsApp alert message"
+              fill
+              sizes="420px"
+              className="object-contain p-4"
+            />
+          </div>
+        </section>
       </main>
     </div>
   );
