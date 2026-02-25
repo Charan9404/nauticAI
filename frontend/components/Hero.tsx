@@ -80,6 +80,46 @@ export function Hero() {
               Contact us
             </Link>
           </motion.div>
+
+          {/* Mobile hero visual below text */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.8, duration: 0.8 }}
+            className="mt-10 w-full max-w-sm self-center md:hidden"
+          >
+            <div className="relative aspect-square overflow-hidden rounded-2xl">
+              {prefersReducedMotion ? (
+                <Image
+                  src="/video1.png"
+                  alt="ROV / AUV / Pipelines sonar scene"
+                  fill
+                  priority
+                  sizes="320px"
+                  className="object-cover"
+                />
+              ) : (
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
+                  aria-label="Underwater sonar view for ROV, AUV and pipeline inspection"
+                  poster="/video1.png"
+                  className="h-full w-full rounded-2xl object-cover opacity-95"
+                  style={{
+                    WebkitMaskImage:
+                      "radial-gradient(circle at 50% 50%, black 0%, black 45%, transparent 72%)",
+                    maskImage:
+                      "radial-gradient(circle at 50% 50%, black 0%, black 45%, transparent 72%)",
+                  }}
+                >
+                  <source src="/video1.mp4" type="video/mp4" />
+                </video>
+              )}
+            </div>
+          </motion.div>
         </motion.div>
       </div>
 
