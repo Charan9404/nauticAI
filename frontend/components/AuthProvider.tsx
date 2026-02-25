@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 
 type User = {
@@ -70,9 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
 
     if (!supabase) return;
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(mapSupabaseUser(session?.user ?? null));
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        setUser(mapSupabaseUser(session?.user ?? null));
+      },
+    );
     return () => {
       ignore = true;
       sub.subscription.unsubscribe();
