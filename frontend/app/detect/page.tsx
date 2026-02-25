@@ -155,7 +155,8 @@ export default function DetectPage() {
       det_counts: Record<string, number>;
       summary: Summary;
     }) => {
-      if (payload.anomaly_log.length === 0 || !user?.phone?.trim()) return;
+      if (payload.anomaly_log.length === 0) return;
+      const normalizedPhone = user?.phone?.replace(/\s/g, "") ?? "";
       runAgentMission({
         anomaly_log: payload.anomaly_log,
         det_counts: payload.det_counts,
@@ -164,8 +165,8 @@ export default function DetectPage() {
         operator_name: operatorName,
         vessel_id: vesselId,
         location,
-        phone: user.phone.replace(/\s/g, ""),
-        send_whatsapp: true,
+        phone: normalizedPhone || undefined,
+        send_whatsapp: Boolean(normalizedPhone),
       })
         .then((res) => {
           setAgentResult(res);
