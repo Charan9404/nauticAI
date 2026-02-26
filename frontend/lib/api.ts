@@ -1,6 +1,7 @@
 /**
  * NautiCAI Detection API client.
- * Backend: FastAPI at NEXT_PUBLIC_API_URL (default: Render production URL).
+ * Production: frontend https://nautic-ai.vercel.app → backend https://nauticai.onrender.com
+ * Set NEXT_PUBLIC_API_URL in Vercel only if using a different backend.
  */
 
 const API_BASE =

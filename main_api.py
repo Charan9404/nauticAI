@@ -45,6 +45,7 @@ SEVERITY = {
     "anode": ("NORMAL", "n", "b-n"),
 }
 DIFF_THRESHOLD = 0.50
+CLASS_NAMES = list(SEVERITY.keys())  # Used by lightweight health check (no model load)
 
 MODEL_PATH = BASE_DIR / "weights" / "best.pt"
 
@@ -61,7 +62,8 @@ FRONTEND_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://nautic-ai-osjw.vercel.app",
-    "https://nautic-ai.vercel.app",
+    "https://nautic-ai.vercel.app",   # Production frontend
+    "https://nautic_ai.vercel.app",   # Vercel alternate origin (if used)
 ]
 
 app.add_middleware(
@@ -296,12 +298,14 @@ class AgentMissionRequest(BaseModel):
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 def health():
-    """Model status and class names for frontend."""
-    m = get_model()
+    """
+    Lightweight liveness check for Render (no model load).
+    Returns quickly to avoid health-check timeouts and extra memory; model loads on first /api/detect/* only.
+    """
     return {
         "status": "ok",
         "model": "Custom YOLOv8s" if MODEL_PATH.exists() else "YOLOv8n Baseline",
-        "classes": list(m.names.values()),
+        "classes": CLASS_NAMES,
     }
 
 @app.post("/api/detect/image")

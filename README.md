@@ -59,7 +59,17 @@ uvicorn main_api:app --reload --host 0.0.0.0 --port 8000
 - **POST** `/api/detect/video` — Upload video, get `anomaly_log` + summary (same smart-log logic as Streamlit)  
 - **POST** `/api/report/generate` — JSON body: `anomaly_log` (with `frame_bytes_base64`), mission metadata → PDF attachment  
 
-CORS is enabled for `localhost:3000` and `localhost:5173`. Use the returned `anomaly_log` from image/video in the report request.
+CORS is enabled for `localhost:3000`, `localhost:5173`, and production frontend `https://nautic-ai.vercel.app`. Use the returned `anomaly_log` from image/video in the report request.
+
+### Live deployment
+
+| Role    | URL |
+|---------|-----|
+| Frontend | https://nautic-ai.vercel.app |
+| Backend  | https://nauticai.onrender.com |
+
+- **Backend (Render):** `/api/health` is lightweight (no model load) so health checks don’t time out or spike memory. If you don’t use `render.yaml`, set **Health Check Path** to `/api/health` in the Render dashboard.
+- **Frontend (Vercel):** Set `NEXT_PUBLIC_API_URL=https://nauticai.onrender.com` in Vercel only if you need to override the default.
 
 ---
 
