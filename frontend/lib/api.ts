@@ -1,21 +1,11 @@
 /**
  * NautiCAI Detection API client.
- * Backend: FastAPI at NEXT_PUBLIC_API_URL.
- * - Local (localhost): defaults to http://localhost:8000
- * - Deployed (Vercel etc.): defaults to production Render URL so we never call localhost from prod.
+ * Backend: FastAPI at NEXT_PUBLIC_API_URL (default: Render production URL).
  */
 
-const PRODUCTION_API_URL = "https://nauticai.onrender.com";
-
-function getApiBase(): string {
-  if (typeof window === "undefined") return PRODUCTION_API_URL;
-  const env = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (env) return env;
-  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-  return isLocal ? "http://localhost:8000" : PRODUCTION_API_URL;
-}
-
-const API_BASE = getApiBase();
+const API_BASE =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL?.trim()) ||
+  "https://nauticai.onrender.com";
 
 export type DetectionItem = {
   class_name: string;
