@@ -71,7 +71,7 @@ function computeStatsFromLog(
 type TabId = "image" | "video" | "report";
 
 export default function DetectPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, token, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
 
   const [tab, setTab] = useState<TabId>("image");
@@ -107,10 +107,10 @@ export default function DetectPage() {
   }, [user?.name]);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && (!user || !token)) {
       router.replace(`/auth/sign-in?next=${encodeURIComponent("/detect")}`);
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, token, router]);
 
   const mergeResults = useCallback(
     (newLog: AnomalyLogItem[], newCounts: Record<string, number>, newSummary: Summary) => {
@@ -139,7 +139,7 @@ export default function DetectPage() {
     form.append("simulate_underwater", String(simulateUnderwater));
     form.append("turbidity", turbidity);
     form.append("marine_snow", String(marineSnow));
-    const data = await detectImage(form);
+    const data = await detectImage(form, token || undefined);
     setAnnotatedImages((prev) => {
       const next = [...prev, data.annotated_image_base64];
       setActiveImageIndex(next.length - 1);
@@ -167,7 +167,7 @@ export default function DetectPage() {
         location,
         phone: normalizedPhone || undefined,
         send_whatsapp: Boolean(normalizedPhone),
-      })
+      }, token || undefined)
         .then((res) => {
           setAgentResult(res);
           setTab("report");
@@ -273,7 +273,7 @@ export default function DetectPage() {
       form.append("marine_snow", String(marineSnow));
       form.append("frame_skip", String(frameSkip));
       form.append("max_frames", String(maxFrames));
-      const data = await detectVideo(form);
+      const data = await detectVideo(form, token || undefined);
       setAnnotatedImages([]);
       setActiveImageIndex(0);
       mergeResults(data.anomaly_log, data.det_counts, data.summary);
@@ -305,13 +305,16 @@ export default function DetectPage() {
     setError(null);
     setReportLoading(true);
     try {
-      const blob = await generateReport({
-        anomaly_log: anomalyLog,
-        mission_name: missionName,
-        operator_name: operatorName,
-        vessel_id: vesselId,
-        location,
-      });
+      const blob = await generateReport(
+        {
+          anomaly_log: anomalyLog,
+          mission_name: missionName,
+          operator_name: operatorName,
+          vessel_id: vesselId,
+          location,
+        },
+        token || undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -353,7 +356,7 @@ export default function DetectPage() {
     setImageModalSrc(null);
   };
 
-  if (authLoading || !user) {
+  if (authLoading || !user || !token) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dark-bg">
         <p className="text-sm text-slate-400">Checking access to the model…</p>

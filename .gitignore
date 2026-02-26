@@ -1,4 +1,5 @@
 venv/
+.venv/
 weights/venv/
 runs/
 __pycache__/
@@ -8,3 +9,26 @@ frontend/.env
 frontend/.env.local
 frontend/.env.development
 frontend/.env.production
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Database
+*.db
+nauticai.db
+
+# Neon
+.agents/
+skills-lock.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

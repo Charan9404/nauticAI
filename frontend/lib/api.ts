@@ -40,7 +40,29 @@ function resolveApiBase(): string {
   return DEFAULT_PROD_API;
 }
 
-const API_BASE = resolveApiBase();
+export const API_BASE = resolveApiBase();
+
+export type UserProfile = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  created_at?: string | null;
+};
+
+export type AuthResponse = {
+  access_token: string;
+  token_type: string;
+  user: UserProfile;
+};
+
+function authHeaders(token?: string, extra?: HeadersInit): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return { ...headers, ...(extra || {}) };
+}
 
 export type DetectionItem = {
   class_name: string;
@@ -92,10 +114,52 @@ export type AgentMissionResponse = {
   llm_used?: boolean;
 };
 
-export async function detectImage(form: FormData): Promise<DetectImageResponse> {
+export async function registerUser(body: {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+}): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Registration failed");
+  }
+  return res.json();
+}
+
+export async function loginUser(body: { email: string; password: string }): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Invalid credentials");
+  }
+  return res.json();
+}
+
+export async function fetchCurrentUser(token: string): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    throw new Error("Session expired");
+  }
+  return res.json();
+}
+
+export async function detectImage(form: FormData, token?: string): Promise<DetectImageResponse> {
   const res = await fetch(`${API_BASE}/api/detect/image`, {
     method: "POST",
     body: form,
+    headers: authHeaders(token),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -104,10 +168,11 @@ export async function detectImage(form: FormData): Promise<DetectImageResponse> 
   return res.json();
 }
 
-export async function detectVideo(form: FormData): Promise<DetectVideoResponse> {
+export async function detectVideo(form: FormData, token?: string): Promise<DetectVideoResponse> {
   const res = await fetch(`${API_BASE}/api/detect/video`, {
     method: "POST",
     body: form,
+    headers: authHeaders(token),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -123,11 +188,12 @@ export async function generateReport(
     operator_name: string;
     vessel_id: string;
     location: string;
-  }
+  },
+  token?: string,
 ): Promise<Blob> {
   const res = await fetch(`${API_BASE}/api/report/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -147,10 +213,10 @@ export async function runAgentMission(body: {
   location: string;
   phone?: string | null;
   send_whatsapp?: boolean;
-}): Promise<AgentMissionResponse> {
+}, token?: string): Promise<AgentMissionResponse> {
   const res = await fetch(`${API_BASE}/api/agent/mission-summary`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) {

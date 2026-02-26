@@ -10,14 +10,21 @@ import time
 import tempfile
 import base64
 import io
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 import json
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import Depends, FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from pydantic import BaseModel, Field
+from sqlalchemy import Column, DateTime, Integer, String, create_engine, func
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from twilio.rest import Client as TwilioClient
 
 # Ensure project root is on path when running as uvicorn main_api:app
@@ -27,6 +34,97 @@ if str(BASE_DIR) not in sys.path:
 
 # Load environment variables from .env (if present)
 load_dotenv(BASE_DIR / ".env")
+
+# ── Database (Neon Postgres by default, falls back to local SQLite) ───────────
+DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'nauticai.db'}"
+# Allow Heroku-style postgres:// URLs
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    email = Column(String(120), unique=True, index=True, nullable=False)
+    phone = Column(String(40), nullable=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+def init_db() -> None:
+    Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+JWT_SECRET = os.getenv("JWT_SECRET", "nauticai-dev-secret-change-me")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # default 7 days
+security = HTTPBearer(auto_error=False)
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        return pwd_context.verify(password, hashed)
+    except Exception:
+        return False
+
+
+def create_access_token(data: dict, expires_minutes: int = ACCESS_TOKEN_EXPIRE_MINUTES) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm="HS256")
+
+
+def decode_token(token: str) -> Optional[dict]:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except JWTError:
+        return None
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+) -> User:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    sub = payload.get("sub")
+    try:
+        user_id = int(sub)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 from underwater_augment import apply_full_underwater_simulation
 from report_gen import generate_report
@@ -52,6 +150,9 @@ app = FastAPI(
     description="Underwater anomaly detection — image/video inference and PDF report generation",
     version="1.0.0",
 )
+
+# Ensure auth tables exist on startup
+init_db()
 
 FRONTEND_ORIGINS = [
     "http://localhost:3000",
@@ -104,21 +205,31 @@ def get_twilio_client():
     return client, from_number
 
 
-def send_whatsapp_alert(phone: str, body: str) -> tuple[bool, str]:
+def send_whatsapp_alert(phone: str, mission_name: str, vessel_id: str, risk_level: str, recommendation: str) -> tuple[bool, str]:
     """
-    Send a WhatsApp message using Twilio.
-    Expects phone like '+6587654321'; we prefix with 'whatsapp:' as required by Twilio.
+    Send a WhatsApp message using Twilio (free-form, works within 24h sandbox window).
+    Twilio sandbox requires user to send "join same-variety" to +1 415 523 8886 first.
     """
     client, from_number = get_twilio_client()
     if client is None or from_number is None:
-        return False, "Twilio WhatsApp not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM)"
+        err = "Twilio WhatsApp not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM)"
+        print(f"[WhatsApp] {err}")
+        return False, err
+    
     to = phone.strip()
     if not to.startswith("whatsapp:"):
         to = f"whatsapp:{to}"
+    
+    # Compose message from template variables
+    body = f"⚠️ Mission Alert: {mission_name} on {vessel_id}\nRisk Level: {risk_level}\nAction: {recommendation}"
+    
     try:
+        print(f"[WhatsApp] Sending freeform message from {from_number} to {to}")
         msg = client.messages.create(from_=from_number, to=to, body=body)
+        print(f"[WhatsApp] SUCCESS: Message SID {msg.sid}")
         return True, msg.sid
     except Exception as e:
+        print(f"[WhatsApp] ERROR: {str(e)}")
         return False, str(e)
 
 
@@ -287,6 +398,35 @@ class ReportGenerateRequest(BaseModel):
     location: str = Field(default="Offshore Location")
 
 
+class UserPublic(BaseModel):
+    id: int
+    name: str
+    email: str
+    phone: str | None = None
+    created_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserPublic
+
+
 class AgentMissionRequest(BaseModel):
     anomaly_log: list = Field(..., description="Client anomaly_log (class_name, confidence, timestamp, frame_bytes_base64)")
     det_counts: dict = Field(default_factory=dict)
@@ -297,6 +437,53 @@ class AgentMissionRequest(BaseModel):
     location: str = Field(default="Offshore Location")
     phone: str | None = Field(default=None, description="Destination WhatsApp number in E.164 format, e.g. +6587654321")
     send_whatsapp: bool = Field(default=True, description="If true and phone present, attempt to send WhatsApp alert")
+
+
+def to_public_user(user: User) -> UserPublic:
+    return UserPublic.from_orm(user)
+
+
+def build_auth_response(user: User) -> AuthResponse:
+    token = create_access_token({"sub": str(user.id), "email": user.email})
+    return AuthResponse(access_token=token, user=to_public_user(user))
+
+
+@app.post("/api/auth/register", response_model=AuthResponse)
+def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    email = body.email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Account already exists for this email")
+
+    user = User(
+        name=body.name.strip() or email.split("@")[0],
+        email=email,
+        phone=body.phone.strip(),
+        password_hash=hash_password(body.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return build_auth_response(user)
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+def login(body: LoginRequest, db: Session = Depends(get_db)):
+    email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return build_auth_response(user)
+
+
+@app.get("/api/auth/me", response_model=UserPublic)
+def auth_me(current_user: User = Depends(get_current_user)):
+    return to_public_user(current_user)
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.get("/api/health")
@@ -318,6 +505,7 @@ async def detect_image(
     simulate_underwater: bool = Form(False),
     turbidity: str = Form("medium"),
     marine_snow: bool = Form(True),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload an image, run YOLOv8 inference, return detections and annotated image.
@@ -412,6 +600,7 @@ async def detect_video(
     marine_snow: bool = Form(True),
     frame_skip: int = Form(1),
     max_frames: int = Form(0),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload a video, run detection on sampled frames, return anomaly_log and summary.
@@ -512,7 +701,7 @@ async def detect_video(
     }
 
 @app.post("/api/report/generate")
-async def report_generate(body: ReportGenerateRequest):
+async def report_generate(body: ReportGenerateRequest, current_user: User = Depends(get_current_user)):
     """
     Generate PDF from anomaly_log. Accepts anomaly_log from /api/detect/image or /api/detect/video.
     Each item may have frame_bytes_base64 (from API) or frame_bytes (bytes); we normalize to bytes for report_gen.
@@ -556,7 +745,7 @@ async def report_generate(body: ReportGenerateRequest):
 
 
 @app.post("/api/agent/mission-summary")
-async def agent_mission_summary(body: AgentMissionRequest):
+async def agent_mission_summary(body: AgentMissionRequest, current_user: User = Depends(get_current_user)):
     """
     Agentic mission triage:
     - Reads anomaly_log, summary and mission metadata
@@ -681,7 +870,13 @@ async def agent_mission_summary(body: AgentMissionRequest):
         llm_used = True
 
     if body.send_whatsapp and body.phone and risk_level in {"MEDIUM", "HIGH"}:
-        sent, info = send_whatsapp_alert(body.phone, whatsapp_message)
+        sent, info = send_whatsapp_alert(
+            phone=body.phone,
+            mission_name=body.mission_name or "Unknown Mission",
+            vessel_id=body.vessel_id or "Unknown Vessel",
+            risk_level=risk_level,
+            recommendation=recommendations
+        )
         whatsapp_result = {"attempted": True, "sent": sent, "info": info}
     else:
         whatsapp_result = {
