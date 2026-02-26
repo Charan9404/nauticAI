@@ -1,12 +1,46 @@
 /**
  * NautiCAI Detection API client.
  * Production: frontend https://nautic-ai.vercel.app → backend https://nauticai.onrender.com
- * Set NEXT_PUBLIC_API_URL in Vercel only if using a different backend.
+ *
+ * Rules:
+ * - On localhost (dev): use NEXT_PUBLIC_API_URL if set, else http://localhost:8000.
+ * - On any deployed domain (e.g. Vercel): always use the Render backend https://nauticai.onrender.com
+ *   so a misconfigured NEXT_PUBLIC_API_URL can’t accidentally point to localhost in production.
  */
 
-const API_BASE =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL?.trim()) ||
-  "https://nauticai.onrender.com";
+const DEFAULT_PROD_API = "https://nauticai.onrender.com";
+
+function resolveApiBase(): string {
+  // Browser runtime (client-side)
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isLocalhost =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "[::1]";
+
+    if (isLocalhost) {
+      // Local dev: allow overriding via env, default to local API
+      return (
+        (typeof process !== "undefined" &&
+          process.env.NEXT_PUBLIC_API_URL?.trim()) ||
+        "http://localhost:8000"
+      );
+    }
+
+    // Any deployed domain (Vercel, custom, etc.): force production backend
+    return DEFAULT_PROD_API;
+  }
+
+  // Server-side / build time: fall back to env or prod default
+  if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL?.trim()) {
+    return process.env.NEXT_PUBLIC_API_URL.trim();
+  }
+
+  return DEFAULT_PROD_API;
+}
+
+const API_BASE = resolveApiBase();
 
 export type DetectionItem = {
   class_name: string;
