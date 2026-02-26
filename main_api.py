@@ -13,8 +13,6 @@ import io
 from pathlib import Path
 import json
 
-import cv2
-import numpy as np
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +28,6 @@ if str(BASE_DIR) not in sys.path:
 # Load environment variables from .env (if present)
 load_dotenv(BASE_DIR / ".env")
 
-from ultralytics import YOLO
 from underwater_augment import apply_full_underwater_simulation
 from report_gen import generate_report
 
@@ -78,8 +75,14 @@ app.add_middleware(
 model = None
 
 def get_model():
+    """
+    Lazily import and initialize the YOLO model on first real detection request.
+    This avoids importing ultralytics/torch during startup and keeps Render health
+    checks fast and lightweight.
+    """
     global model
     if model is None:
+        from ultralytics import YOLO  # Local import to avoid heavy startup cost
         if MODEL_PATH.exists():
             model = YOLO(str(MODEL_PATH))
         else:
@@ -328,6 +331,13 @@ async def detect_image(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
 
+    # Lazy imports avoid heavy cv2/numpy import cost during service startup
+    try:
+        import cv2
+        import numpy as np
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to import image libraries: {e}")
+
     img = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(status_code=400, detail="Could not decode image")
@@ -350,6 +360,7 @@ async def detect_image(
     ts = time.strftime("%H:%M:%S")
 
     if boxes is not None and len(boxes) > 0:
+        import cv2
         _, buf = cv2.imencode(".jpg", cv2.cvtColor(ann, cv2.COLOR_BGR2RGB))
         frame_bytes = buf.tobytes()
         for box in boxes:
@@ -363,6 +374,7 @@ async def detect_image(
             smart_log(cn, cf, ts, frame_bytes, class_tracker, anomaly_log, det_counts)
 
     # Encode annotated image for frontend
+    import cv2
     _, ann_buf = cv2.imencode(".jpg", cv2.cvtColor(ann, cv2.COLOR_BGR2RGB))
     annotated_base64 = base64.b64encode(ann_buf.tobytes()).decode("utf-8")
 
@@ -420,6 +432,8 @@ async def detect_video(
         path = t.name
 
     try:
+        import cv2
+
         cap = cv2.VideoCapture(path)
         if not cap.isOpened():
             raise HTTPException(status_code=400, detail="Could not open video")
@@ -452,6 +466,7 @@ async def detect_video(
             ts = f"{mm:02d}:{ss:02d}"
 
             if results[0].boxes and len(results[0].boxes) > 0:
+                import cv2
                 _, buf = cv2.imencode(".jpg", cv2.cvtColor(ann, cv2.COLOR_BGR2RGB))
                 frame_bytes = buf.tobytes()
                 best_per_class = {}
