@@ -12,7 +12,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local env
+# Local env (do not commit; set NEXT_PUBLIC_API_URL in Vercel for prod)
+.env
 .env*.local
 
 # Vercel
