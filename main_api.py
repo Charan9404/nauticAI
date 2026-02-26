@@ -61,6 +61,7 @@ FRONTEND_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://nautic-ai-osjw.vercel.app",
+    "https://nautic-ai.vercel.app",
 ]
 
 app.add_middleware(
@@ -71,7 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Model (loaded once at startup) ───────────────────────────────────────────
+# ── Model (lazy load on first request to keep Render free tier under 512MB at startup) ──
 model = None
 
 def get_model():
@@ -82,10 +83,6 @@ def get_model():
         else:
             model = YOLO("yolov8n.pt")
     return model
-
-@app.on_event("startup")
-def startup():
-    get_model()
 
 
 def get_twilio_client():
