@@ -17,21 +17,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better layer caching
-COPY NauticAi/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY NauticAi/main_api.py .
-COPY NauticAi/report_gen.py .
-COPY NauticAi/underwater_augment.py .
-COPY NauticAi/data.yaml .
+COPY main_api.py .
+COPY report_gen.py .
+COPY underwater_augment.py .
+COPY data.yaml .
 
 # Copy model weights
-COPY NauticAi/weights/ ./weights/
-COPY NauticAi/yolov8n.pt .
-COPY NauticAi/yolov8s.pt .
+COPY weights/ ./weights/
+COPY yolov8n.pt .
+COPY yolov8s.pt .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
