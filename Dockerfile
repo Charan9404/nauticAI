@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main_api.py .
 COPY report_gen.py .
+COPY underwater_augment.py .
 COPY data.yaml .
 
 # Copy model weights
