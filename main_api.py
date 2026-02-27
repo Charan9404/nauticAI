@@ -166,8 +166,9 @@ FRONTEND_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://nautic-ai-osjw.vercel.app",
-    "https://nautic-ai.vercel.app",   # Production frontend
-    "https://nautic_ai.vercel.app",   # Vercel alternate origin (if used)
+    "https://nautic-ai.vercel.app",
+    "https://nautic_ai.vercel.app",
+    "https://nauticai.vercel.app",    # Production frontend
 ]
 
 app.add_middleware(
