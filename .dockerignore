@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Node/Frontend (deployed separately on Vercel)
+frontend/
+node_modules/
+package*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing/Development
+*.log
+*.tmp
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+*.md
+!README.md
+
+# Render config (not needed for GCP)
+render.yaml
+
+# Backup files
+*_backup.py
+app.py
+
+# Training scripts (not needed in production)
+train.py
+split_dataset.py
+remap_labels.py
+underwater_augment.py
+check.py
+rg_check.py
+
+# Data files
+*.yaml
+!data.yaml
+installed.txt
+packages.txt
+
+# Skills/Agents
+.agents/
+skills-lock.json

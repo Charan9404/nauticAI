@@ -10,7 +10,11 @@ import time
 import tempfile
 import base64
 import io
-from datetime import datetime, timedelta
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 import json
@@ -58,6 +62,8 @@ class User(Base):
     email = Column(String(120), unique=True, index=True, nullable=False)
     phone = Column(String(40), nullable=True)
     password_hash = Column(String(255), nullable=False)
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -92,7 +98,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def create_access_token(data: dict, expires_minutes: int = ACCESS_TOKEN_EXPIRE_MINUTES) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, JWT_SECRET, algorithm="HS256")
 
@@ -421,6 +427,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+    confirm_password: str
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -479,6 +495,139 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     return build_auth_response(user)
+
+
+def send_reset_email(to_email: str, reset_link: str) -> bool:
+    """
+    Send password reset email via SMTP (Brevo recommended).
+    
+    Brevo Free Tier: 300 emails/day
+    Get your SMTP key: https://app.brevo.com/settings/keys/smtp
+    
+    Required env vars:
+    - BREVO_SMTP_KEY: Your Brevo SMTP key (or SMTP_PASS as fallback)
+    - SMTP_FROM: Verified sender email in Brevo (e.g., noreply@nauticai.com or your email)
+    """
+    # Brevo as default, with Gmail fallback
+    smtp_host = os.getenv("SMTP_HOST", "smtp-relay.brevo.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER") or os.getenv("BREVO_LOGIN")  # Brevo login email
+    smtp_pass = os.getenv("BREVO_SMTP_KEY") or os.getenv("SMTP_PASS")  # Brevo SMTP key
+    smtp_from = os.getenv("SMTP_FROM") or smtp_user  # Sender email (must be verified in Brevo)
+    
+    if not smtp_user or not smtp_pass:
+        print("[WARN] SMTP not configured. Set BREVO_SMTP_KEY and SMTP_USER (or SMTP_FROM). Reset email not sent.")
+        return False
+    
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Reset your NautiCAI password"
+    msg["From"] = f"NautiCAI <{smtp_from}>"
+    msg["To"] = to_email
+    
+    text_content = f"""
+Hello,
+
+You requested a password reset for your NautiCAI account.
+
+Click this link to reset your password:
+{reset_link}
+
+This link expires in 1 hour.
+
+If you didn't request this, you can safely ignore this email.
+
+— The NautiCAI Team
+"""
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e2e8f0; padding: 40px 20px; }}
+    .container {{ max-width: 500px; margin: 0 auto; background: #12121a; border-radius: 16px; padding: 32px; border: 1px solid #2d2d3d; }}
+    .logo {{ color: #a78bfa; font-size: 24px; font-weight: bold; margin-bottom: 24px; }}
+    h1 {{ color: #ffffff; font-size: 20px; margin-bottom: 16px; }}
+    p {{ color: #94a3b8; line-height: 1.6; margin-bottom: 16px; }}
+    .btn {{ display: inline-block; background: linear-gradient(to right, #7c3aed, #8b5cf6); color: white; padding: 14px 28px; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 16px 0; }}
+    .footer {{ color: #64748b; font-size: 12px; margin-top: 32px; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">NautiCAI</div>
+    <h1>Reset your password</h1>
+    <p>You requested a password reset for your NautiCAI account. Click the button below to set a new password.</p>
+    <a href="{reset_link}" class="btn">Reset Password</a>
+    <p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+    <div class="footer">— The NautiCAI Team</div>
+  </div>
+</body>
+</html>
+"""
+    
+    msg.attach(MIMEText(text_content, "plain"))
+    msg.attach(MIMEText(html_content, "html"))
+    
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, to_email, msg.as_string())
+        print(f"[INFO] Password reset email sent to {to_email}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to send reset email: {e}")
+        return False
+
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Request a password reset link. Always returns success to prevent email enumeration."""
+    email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    
+    if user:
+        # Generate secure token
+        token = secrets.token_urlsafe(32)
+        user.password_reset_token = token
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        db.commit()
+        
+        # Build reset link - use frontend URL
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        reset_link = f"{frontend_url}/auth/reset-password?token={token}"
+        
+        # Send email
+        send_reset_email(email, reset_link)
+    
+    # Always return success to prevent email enumeration
+    return {"message": "If an account exists with this email, a reset link has been sent."}
+
+
+@app.post("/api/auth/reset-password")
+def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using the token from email."""
+    if body.password != body.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    user = db.query(User).filter(User.password_reset_token == body.token).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    if user.password_reset_expires and user.password_reset_expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
+    
+    # Update password and clear reset token
+    user.password_hash = hash_password(body.password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.commit()
+    
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
 
 
 @app.get("/api/auth/me", response_model=UserPublic)

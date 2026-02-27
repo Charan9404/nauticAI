@@ -1,16 +1,17 @@
 /**
  * NautiCAI Detection API client.
- * Production: frontend https://nautic-ai.vercel.app → backend https://nauticai.onrender.com
+ * Production: frontend on Vercel → backend on GCP Cloud Run
  *
- * Rules:
- * - On localhost (dev): use NEXT_PUBLIC_API_URL if set, else http://localhost:8000.
- * - On any deployed domain (e.g. Vercel): always use the Render backend https://nauticai.onrender.com
- *   so a misconfigured NEXT_PUBLIC_API_URL can’t accidentally point to localhost in production.
+ * Set NEXT_PUBLIC_API_URL in Vercel environment variables to your Cloud Run URL.
+ * Example: https://nauticai-xxxxxx-xx.a.run.app
  */
 
-const DEFAULT_PROD_API = "https://nauticai.onrender.com";
+const DEFAULT_PROD_API = ""; // Set NEXT_PUBLIC_API_URL in Vercel env vars
 
 function resolveApiBase(): string {
+  // Check for explicitly set environment variable (works in both dev and prod)
+  const envUrl = typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL?.trim();
+  
   // Browser runtime (client-side)
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
@@ -20,24 +21,19 @@ function resolveApiBase(): string {
       host === "[::1]";
 
     if (isLocalhost) {
-      // Local dev: allow overriding via env, default to local API
-      return (
-        (typeof process !== "undefined" &&
-          process.env.NEXT_PUBLIC_API_URL?.trim()) ||
-        "http://localhost:8000"
-      );
+      return envUrl || "http://localhost:8000";
     }
 
-    // Any deployed domain (Vercel, custom, etc.): force production backend
-    return DEFAULT_PROD_API;
+    // Production: use env var (GCP Cloud Run URL)
+    if (envUrl) {
+      return envUrl;
+    }
+    
+    console.warn("NEXT_PUBLIC_API_URL not set! Configure it in Vercel.");
+    return "http://localhost:8000";
   }
 
-  // Server-side / build time: fall back to env or prod default
-  if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL?.trim()) {
-    return process.env.NEXT_PUBLIC_API_URL.trim();
-  }
-
-  return DEFAULT_PROD_API;
+  return envUrl || "http://localhost:8000";
 }
 
 export const API_BASE = resolveApiBase();
@@ -151,6 +147,36 @@ export async function fetchCurrentUser(token: string): Promise<UserProfile> {
   });
   if (!res.ok) {
     throw new Error("Session expired");
+  }
+  return res.json();
+}
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to send reset email");
+  }
+  return res.json();
+}
+
+export async function resetPassword(body: {
+  token: string;
+  password: string;
+  confirm_password: string;
+}): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Password reset failed");
   }
   return res.json();
 }

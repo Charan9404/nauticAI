@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -98,6 +98,8 @@ export default function DetectPage() {
   const [error, setError] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [agentResult, setAgentResult] = useState<AgentMissionResponse | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const agentSectionRef = useRef<HTMLElement>(null);
   const [imageModalSrc, setImageModalSrc] = useState<string | null>(null);
   const [imageModalCaption, setImageModalCaption] = useState<string>("");
   const [imageModalZoom, setImageModalZoom] = useState(1);
@@ -156,6 +158,9 @@ export default function DetectPage() {
       summary: Summary;
     }) => {
       if (payload.anomaly_log.length === 0) return;
+      // Instantly switch to report tab and show loading
+      setTab("report");
+      setAgentLoading(true);
       const normalizedPhone = user?.phone?.replace(/\s/g, "") ?? "";
       runAgentMission({
         anomaly_log: payload.anomaly_log,
@@ -170,11 +175,17 @@ export default function DetectPage() {
       }, token || undefined)
         .then((res) => {
           setAgentResult(res);
-          setTab("report");
+          setAgentLoading(false);
+          // Auto-scroll to agent section after a short delay for render
+          setTimeout(() => {
+            agentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 100);
         })
-        .catch(() => {});
+        .catch(() => {
+          setAgentLoading(false);
+        });
     },
-    [user?.phone, missionName, operatorName, vesselId, location]
+    [user?.phone, missionName, operatorName, vesselId, location, token]
   );
 
   const runImageDetection = async (file: File) => {
@@ -202,7 +213,10 @@ export default function DetectPage() {
         warnings: summary.warnings + data.summary.warnings,
         normal: summary.normal + data.summary.normal,
       };
-      triggerAgentAlert({ anomaly_log: mergedLog, det_counts: mergedCounts, summary: mergedSummary });
+      // Show live preview for 2.5 seconds, then trigger agent
+      setTimeout(() => {
+        triggerAgentAlert({ anomaly_log: mergedLog, det_counts: mergedCounts, summary: mergedSummary });
+      }, 2500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Detection failed");
     } finally {
@@ -241,11 +255,14 @@ export default function DetectPage() {
         };
       }
       setTab("image");
-      triggerAgentAlert({
-        anomaly_log: accumulatedLog,
-        det_counts: accumulatedCounts,
-        summary: accumulatedSummary,
-      });
+      // Show live preview for 2.5 seconds, then trigger agent
+      setTimeout(() => {
+        triggerAgentAlert({
+          anomaly_log: accumulatedLog,
+          det_counts: accumulatedCounts,
+          summary: accumulatedSummary,
+        });
+      }, 2500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Detection failed");
     } finally {
@@ -289,7 +306,10 @@ export default function DetectPage() {
         warnings: summary.warnings + data.summary.warnings,
         normal: summary.normal + data.summary.normal,
       };
-      triggerAgentAlert({ anomaly_log: mergedLog, det_counts: mergedCounts, summary: mergedSummary });
+      // Show results for 2.5 seconds, then trigger agent
+      setTimeout(() => {
+        triggerAgentAlert({ anomaly_log: mergedLog, det_counts: mergedCounts, summary: mergedSummary });
+      }, 2500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Video analysis failed");
     } finally {
@@ -387,19 +407,22 @@ export default function DetectPage() {
 
       {/* Top bar */}
       <div className="sticky top-0 z-40 border-b border-dark-border/50 bg-dark-bg/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-6 md:h-14 md:py-0">
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-6 md:h-14 md:py-0 relative">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             <Link
               href="/"
               className="shrink-0 text-xs font-medium uppercase tracking-widest text-slate-500 transition hover:text-lavender-400"
             >
               ← Home
             </Link>
-            <span className="truncate font-display text-sm font-semibold text-white">
-              <span className="hidden sm:inline">NautiCAI Detection Console</span>
-              <span className="sm:hidden">Console</span>
-            </span>
           </div>
+          <span 
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-base font-bold bg-clip-text text-transparent tracking-wide"
+            style={{ backgroundImage: 'linear-gradient(90deg, #a78bfa 0%, #c4b5fd 40%, #ffffff 100%)' }}
+          >
+            <span className="hidden sm:inline">NautiCAI Detection Console</span>
+            <span className="sm:hidden">Console</span>
+          </span>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <span className="max-w-[120px] truncate text-xs text-slate-500 sm:max-w-none" title={user.email}>
               Signed in as {user.email}
@@ -425,9 +448,9 @@ export default function DetectPage() {
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`shrink-0 rounded-t-lg border border-b-0 px-4 py-3 text-xs font-semibold uppercase tracking-wider transition sm:px-5 ${
+                className={`shrink-0 rounded-t-lg border border-b-0 px-4 py-3 text-xs font-semibold uppercase tracking-wider transition-all duration-200 sm:px-5 ${
                   tab === t.id
-                    ? "border-lavender-500/50 bg-dark-card/80 text-lavender-200 shadow-sm"
+                    ? "border-lavender-500/60 bg-gradient-to-b from-lavender-500/20 to-dark-card/80 text-lavender-200 shadow-lg shadow-lavender-500/20"
                     : "border-transparent text-slate-500 hover:bg-dark-card/40 hover:text-slate-300"
                 }`}
               >
@@ -439,13 +462,15 @@ export default function DetectPage() {
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        {/* Mission summary strip — always visible; 2x2 on mobile, 4 cols on sm+ */}
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:grid-cols-4 sm:gap-4">
-          <MetricCard label="Total detections" value={summary.total} accent="white" />
-          <MetricCard label="Critical" value={summary.critical} accent="red" />
-          <MetricCard label="Warnings" value={summary.warnings} accent="amber" />
-          <MetricCard label="Healthy / anode" value={summary.normal} accent="emerald" />
-        </section>
+        {/* Mission summary strip — visible on image/video tabs (report has its own) */}
+        {tab !== "report" && (
+          <section className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:grid-cols-4 sm:gap-4">
+            <MetricCard label="Total detections" value={summary.total} accent="white" />
+            <MetricCard label="Critical" value={summary.critical} accent="red" />
+            <MetricCard label="Warnings" value={summary.warnings} accent="amber" />
+            <MetricCard label="Healthy / anode" value={summary.normal} accent="emerald" />
+          </section>
+        )}
 
         {error && (
           <motion.div
@@ -598,10 +623,13 @@ export default function DetectPage() {
                           )}
                         </>
                       ) : (
-                        <p className="px-6 py-10 text-center text-sm text-slate-500">
-                          No run yet. Upload a frame (or multiple) and click{" "}
-                          <span className="font-medium text-lavender-300">Run detection</span>.
-                        </p>
+                        <div className="relative px-6 py-10 text-center">
+                          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-lavender-500/5 via-purple-500/10 to-lavender-500/5 animate-pulse" />
+                          <p className="relative text-sm text-slate-500">
+                            No run yet. Upload a frame (or multiple) and click{" "}
+                            <span className="font-medium text-lavender-300">Run detection</span>.
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -901,8 +929,20 @@ export default function DetectPage() {
                     </button>
                   </div>
 
-                  {agentResult && (
+                  {/* Agent loading state */}
+                  {agentLoading && !agentResult && (
                     <section className="mt-6 rounded-2xl border border-lavender-500/40 bg-dark-card/80 p-4 text-sm text-slate-200">
+                      <div className="flex items-center gap-3">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-lavender-500/30 border-t-lavender-400"></div>
+                        <p className="font-display text-sm font-semibold text-white">
+                          Agent processing... Analyzing risk &amp; sending WhatsApp alert
+                        </p>
+                      </div>
+                    </section>
+                  )}
+
+                  {agentResult && (
+                    <section ref={agentSectionRef} className="mt-6 rounded-2xl border border-lavender-500/40 bg-dark-card/80 p-4 text-sm text-slate-200">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <p className="font-display text-sm font-semibold text-white">
                           Agent mission triage — {agentResult.risk_level} risk (auto after run)
@@ -1007,12 +1047,12 @@ function MetricCard({
 }) {
   const border =
     accent === "red"
-      ? "border-t-red-500/50"
+      ? "border-t-red-500/50 hover:border-t-red-400"
       : accent === "amber"
-        ? "border-t-amber-500/50"
+        ? "border-t-amber-500/50 hover:border-t-amber-400"
         : accent === "emerald"
-          ? "border-t-emerald-500/50"
-          : "border-t-lavender-500/50";
+          ? "border-t-emerald-500/50 hover:border-t-emerald-400"
+          : "border-t-lavender-500/50 hover:border-t-lavender-400";
   const text =
     accent === "red"
       ? "text-red-400"
@@ -1021,8 +1061,16 @@ function MetricCard({
         : accent === "emerald"
           ? "text-emerald-400"
           : "text-white";
+  const glow =
+    accent === "red"
+      ? "hover:shadow-red-500/20"
+      : accent === "amber"
+        ? "hover:shadow-amber-500/20"
+        : accent === "emerald"
+          ? "hover:shadow-emerald-500/20"
+          : "hover:shadow-lavender-500/20";
   return (
-    <div className={`rounded-xl border border-dark-border border-t-[3px] bg-dark-card/80 p-5 backdrop-blur-sm ${border}`}>
+    <div className={`rounded-xl border border-dark-border border-t-[3px] bg-dark-card/80 p-5 backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-lg cursor-default ${border} ${glow}`}>
       <p className={`font-display text-3xl font-bold md:text-4xl ${text}`}>{value}</p>
       <p className="mt-2 text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p>
     </div>
@@ -1110,7 +1158,7 @@ function ImageUploadAndRun({
         type="button"
         disabled={files.length === 0 || loading}
         onClick={() => files.length && onRun(files)}
-        className="w-full rounded-xl bg-gradient-to-r from-lavender-600 to-lavender-700 py-3 text-sm font-semibold text-white shadow-lavender-glow transition hover:from-lavender-500 disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-r from-lavender-600 to-lavender-700 py-3 text-sm font-semibold text-white shadow-lavender-glow transition-all duration-200 hover:from-lavender-500 hover:shadow-xl hover:shadow-lavender-500/30 hover:scale-[1.01] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-lavender-glow"
       >
         {loading ? (loadingProgress ?? "Running detection…") : "Run detection"}
       </button>
@@ -1141,7 +1189,7 @@ function VideoUploadAndRun({
         type="button"
         disabled={!file || loading}
         onClick={() => file && onRun(file)}
-        className="w-full rounded-xl bg-gradient-to-r from-lavender-600 to-lavender-700 py-3 text-sm font-semibold text-white shadow-lavender-glow transition hover:from-lavender-500 disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-r from-lavender-600 to-lavender-700 py-3 text-sm font-semibold text-white shadow-lavender-glow transition-all duration-200 hover:from-lavender-500 hover:shadow-xl hover:shadow-lavender-500/30 hover:scale-[1.01] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-lavender-glow"
       >
         {loading ? "Analyzing video…" : "Run video analysis"}
       </button>
